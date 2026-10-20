@@ -1,0 +1,132 @@
+import random
+import flet as ft
+
+# القوائم الأساسية للكلمات
+jobs_en = ["Doctor", "Engineer", "Teacher", "Pilot", "Musician", "Lawyer"]
+animals_en = ["Lion", "Elephant", "Cat", "Dog", "Tiger", "Giraffe"]
+places_en = ["Cafe", "Hotel", "Mall", "Supermarket"]
+
+jobs_ar = ["طبيب", "مهندس", "مدرس", "طيار", "موسيقي", "محامي"]
+animals_ar = ["أسد", "فيل", "قطة", "كلب", "نمر", "زرافة"]
+places_ar = ["كافيه", "فندق", "مول", "سوبر ماركت"]
+
+def main(page: ft.Page):
+    page.title = "لعبة الامبوستر - Imposter Game"
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.window_width = 450
+    page.window_height = 650
+
+    # عناصر واجهة المستخدم للإعدادات الأولى
+    lang_dropdown = ft.Dropdown(
+        label="اختر اللغة / Choose Language",
+        options=[
+            ft.dropdown.Option("ar", "العربية"),
+            ft.dropdown.Option("en", "English"),
+        ],
+        value="ar"
+    )
+    
+    players_input = ft.TextField(
+        label="أسماء اللاعبين (مفصولة بفاصلة ,)",
+        hint_text="أحمد, محمد, علي",
+        multiline=False
+    )
+
+    output_column = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+
+    def start_game(e):
+        output_column.controls.clear()
+        lang = lang_dropdown.value
+        players_text = players_input.value.strip()
+
+        if not players_text:
+            output_column.controls.append(ft.Text("الرجاء إدخال أسماء اللاعبين أولاً!", color="red"))
+            page.update()
+            return
+
+        players = [p.strip() for p in players_text.split(",") if p.strip()]
+        if len(players) < 3:
+            output_column.controls.append(ft.Text("يجب أن يكون عدد اللاعبين 3 على الأقل!", color="red"))
+            page.update()
+            return
+
+        # تحديد الفئات والكلمات حسب اللغة
+        if lang == "ar":
+            categories = {"وظيفة": jobs_ar, "حيوان": animals_ar, "مكان": places_ar}
+        else:
+            categories = {"Job": jobs_en, "Animal": animals_en, "Place": places_en}
+
+        main_category = random.choice(list(categories.keys()))
+        main_word = random.choice(categories[main_category])
+
+        odd_player_idx = random.randint(0, len(players) - 1)
+        odd_category = random.choice([c for c in categories.keys() if c != main_category])
+        odd_word = random.choice(categories[odd_category])
+
+        words = [main_word if i != odd_player_idx else odd_word for i in range(len(players))]
+
+        # متغيرات تتبع حالة عرض الكلمات للاعبيين
+        current_idx = [0]
+
+        title_text = ft.Text("توزيع الكلمات على اللاعبين", size=20, weight=ft.FontWeight.BOLD)
+        info_text = ft.Text(f"أعطِ الهاتف إلى اللاعب: {players[0]}", size=16)
+        word_display = ft.Text("", size=22, weight=ft.FontWeight.BOLD, color="blue")
+
+        def show_word_click(e):
+            idx = current_idx[0]
+            if idx < len(players):
+                # إظهار الكلمة لهذا اللاعب مؤقتاً
+                word_display.value = f"كلمتك هي: {words[idx]}"
+                reveal_btn.visible = False
+                next_player_btn.visible = True
+                page.update()
+
+        def next_player_click(e):
+            current_idx[0] += 1
+            idx = current_idx[0]
+            if idx < len(players):
+                info_text.value = f"أعطِ الهاتف إلى اللاعب: {players[idx]}"
+                word_display.value = ""
+                reveal_btn.visible = True
+                next_player_btn.visible = False
+                page.update()
+            else:
+                # الانتقال لمرحلة الأدوار وترتيب الأسئلة
+                output_column.controls.clear()
+                output_column.controls.append(ft.Text("🎯 ترتيب الأسئلة والأدوار:", size=18, weight=ft.FontWeight.BOLD))
+                for i in range(len(players)):
+                    asker = players[i]
+                    answerer = players[(i + 1) % len(players)]
+                    output_column.controls.append(ft.Text(f"• {asker} يسأل {answerer}"))
+                
+                # زر الانتقال لكشف الامبوستر
+                reveal_imposter_btn = ft.ElevatedButton("كشف الامبوستر 🕵️", on_click=lambda _: show_imposter_results())
+                output_column.controls.append(reveal_imposter_btn)
+                page.update()
+
+        reveal_btn = ft.ElevatedButton("إظهار الكلمة", on_click=show_word_click)
+        next_player_btn = ft.ElevatedButton("اللاعب التالي", on_click=next_player_click, visible=False)
+
+        def show_imposter_results():
+            output_column.controls.clear()
+            output_column.controls.append(ft.Text("🚨 انتهت الأسئلة!", size=20, weight=ft.FontWeight.BOLD, color="red"))
+            output_column.controls.append(ft.Text(f"🕵️ الامبوستر هو: {players[odd_player_idx]} (كلمته كانت: {words[odd_player_idx]})", size=16))
+            output_column.controls.append(ft.Text(f"✨ الكلمة الأصلية كانت: {main_word}", size=16, weight=ft.FontWeight.BOLD))
+            page.update()
+
+        output_column.controls.clear()
+        output_column.controls.extend([title_text, info_text, reveal_btn, next_player_btn, word_display])
+        page.update()
+
+    start_btn = ft.ElevatedButton("بدء اللعبة", on_click=start_game, color="white", bgcolor="blue")
+
+    page.add(
+        ft.Text("لعبة الامبوستر", size=24, weight=ft.FontWeight.BOLD),
+        lang_dropdown,
+        players_input,
+        start_btn,
+        output_column
+    )
+
+ft.app(target=main)
